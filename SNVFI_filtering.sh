@@ -8,6 +8,14 @@
 # @Args: (1) Path to .cfg file containing paths to tools. (2) Path to .ini file containing
 # job specific settings
 
+#MODIFICATION by Freek Manders
+# @Date: 27-11-2018
+# @Description: Free combinations of chromosomes can now be chosen. Also added filtering on MQ
+
+# MODIFICATION by Rurika Oka
+# @Date: 09-04-2018
+# @Description: Added option to select autosomal or chrX for the filtering
+
 # -----------------------------------------------------------------------------
 # Define helper functions
 # -----------------------------------------------------------------------------
@@ -42,6 +50,10 @@ if [ ! -d $TMP_DIR ]; then
     mkdir $TMP_DIR
 fi
 
+#Create chromosome filter for bio-vcf
+CHROMS_LIST=$(echo $CHR | sed 's/ /$|^/g')
+CHR_OPT="r.chrom =~ /^$CHROMS_LIST$/"
+
 
 # get sample names
 SAMPLES=($($run_GREP -P "^#CHROM" < $SNV))
@@ -68,19 +80,13 @@ techo $CON_NAME" is used as the control sample" >> $LOG
 
 
 # make output file names
-s="_Q"$QUAL"_CGQ"$CON_GQ"_SGQ"$SUB_GQ"_"$FILTER"_"$COV"X_autosomal.vcf"
-vcf_filtered="$OUT_DIR$SUB_NAME"_"$CON_NAME$s"
+s="_Q"$QUAL"_CGQ"$CON_GQ"_SGQ"$SUB_GQ"_"$FILTER"_"$COV"X_"$CHR_NAM
+vcf_filtered=$OUT_DIR$SUB_NAME"_"$CON_NAME$s".vcf"
+vcf_filtered_zip=$OUT_DIR$SUB_NAME"_"$CON_NAME$s".vcf.gz"
+vcf_no_blacklist=$OUT_DIR$SUB_NAME"_"$CON_NAME$s"_nonBlacklist.vcf.gz"
+vcf_no_evidence_and_called=$OUT_DIR$SUB_NAME"_"$CON_NAME$s"_nonBlacklist_noEvidenceCon.vcf"
 
-s="_Q"$QUAL"_CGQ"$CON_GQ"_SGQ"$SUB_GQ"_"$FILTER"_"$COV"X_autosomal.vcf.gz"
-vcf_filtered_zip="$OUT_DIR$SUB_NAME"_"$CON_NAME$s"
-
-s="_Q"$QUAL"_CGQ"$CON_GQ"_SGQ"$SUB_GQ"_"$FILTER"_"$COV"X_autosomal_nonBlacklist.vcf.gz"
-vcf_no_blacklist="$OUT_DIR$SUB_NAME"_"$CON_NAME$s"
-
-s="_Q"$QUAL"_CGQ"$CON_GQ"_SGQ"$SUB_GQ"_"$FILTER"_"$COV"X_autosomal_nonBlacklist_noEvidenceCon.vcf"
-vcf_no_evidence_and_called="$OUT_DIR$SUB_NAME"_"$CON_NAME$s"
-
-s="_Q"$QUAL"_CGQ"$CON_GQ"_SGQ"$SUB_GQ"_"$FILTER"_"$COV"X_VAF"$VAF"_autosomal_nonBlacklist_final.vcf"
+s="_Q"$QUAL"_CGQ"$CON_GQ"_SGQ"$SUB_GQ"_"$FILTER"_"$COV"X_VAF"$VAF"_"$CHR_NAM"_nonBlacklist_final.vcf"
 vcf_final="$OUT_DIR$SUB_NAME"_"$CON_NAME$s"
 
 s="_VAF.pdf"
@@ -90,13 +96,13 @@ techo "(1) Filtering SNV file with bio_vcf STARTED" >> $LOG
 # bio vcf is zero based: subtract one from CON and sub index
 export TMPDIR=$TMP_DIR
 if [ $FILTER = "PASS" ]; then
-  cat $SNV | $run_BIOVCF -i --num-threads $MAX_THREADS --thread-lines 50_000 --filter "r.filter=='PASS' and r.qual>=$QUAL and r.chrom.to_i>0 and r.chrom.to_i<23" \
+  cat $SNV | $run_BIOVCF -i --num-threads $MAX_THREADS --thread-lines 50_000 --filter "r.qual>=$QUAL and r.filter=='PASS' and $CHR_OPT" \
   --sfilter-samples $(($CON-1)),$(($SUB-1)) --sfilter "!s.empty? and s.dp>=$COV" 1>$vcf_filtered"tmp1" 2>>$ERR
   cat $vcf_filtered"tmp1" | $run_BIOVCF -i --num-threads $MAX_THREADS --thread-lines 50_000 --sfilter-samples $(($CON-1)) --sfilter "s.gq>=$CON_GQ" 1>$vcf_filtered"tmp2" 2>>$ERR
   cat $vcf_filtered"tmp2" | $run_BIOVCF -i --num-threads $MAX_THREADS --thread-lines 50_000 --sfilter-samples $(($SUB-1)) --sfilter "s.gq>=$SUB_GQ" 1>$vcf_filtered 2>>$ERR
 
 elif [ $FILTER = "ALL" ]; then
-  cat $SNV | $run_BIOVCF -i --num-threads $MAX_THREADS --thread-lines 50_000 --filter "r.qual>=$QUAL and r.chrom.to_i>0 and r.chrom.to_i<23" \
+  cat $SNV | $run_BIOVCF -i --num-threads $MAX_THREADS --thread-lines 50_000 --filter "r.qual>=$QUAL and $CHR_OPT" \
   --sfilter-samples $(($CON-1)),$(($SUB-1)) --sfilter "!s.empty? and s.dp>=$COV"  1>$vcf_filtered"tmp1" 2>>$ERR
   cat $vcf_filtered"tmp1" | $run_BIOVCF -i --num-threads $MAX_THREADS --thread-lines 50_000 --sfilter-samples $(($CON-1)) --sfilter "s.gq>=$CON_GQ" 1>$vcf_filtered"tmp2" 2>>$ERR
   cat $vcf_filtered"tmp2" | $run_BIOVCF -i --num-threads $MAX_THREADS --thread-lines 50_000 --sfilter-samples $(($SUB-1)) --sfilter "s.gq>=$SUB_GQ" 1>$vcf_filtered 2>>$ERR
@@ -114,7 +120,7 @@ techo "(1) Filtering SNV file with bio_vcf DONE" >> $LOG
 echo "Input file:" > $COUNTS
 $run_GREP -Pvc "^#" $SNV >> $COUNTS
 
-echo "Q"$QUAL" CGQ"$CON_GQ" SGQ"$SUB_GQ $FILTER $COV"X autosomal:" >> $COUNTS
+echo "Q"$QUAL" CGQ"$CON_GQ" SGQ"$SUB_GQ $FILTER $COV"X "$CHR_NAM":" >> $COUNTS
 $run_GREP -Pvc "^#" $vcf_filtered >> $COUNTS
 
 techo "(2) Removing blacklisted SNPs from SNV file STARTED" >> $LOG
@@ -122,7 +128,7 @@ COUNT=1
 vcf_tmp=$vcf_filtered_zip
 for vcf in "${BLACKLIST[@]}";
 do
-    OUT=$TMP_DIR/$SUB_NAME"_"$CON_NAME"_Q"$QUAL"_CGQ"$CON_GQ"_SGQ"$SUB_GQ"_"$FILTER"_"$COV"X_autosomal_nonBlacklist_"$COUNT
+    OUT=$TMP_DIR/$SUB_NAME"_"$CON_NAME"_Q"$QUAL"_CGQ"$CON_GQ"_SGQ"$SUB_GQ"_"$FILTER"_"$COV"X_"$CHR_NAM"_nonBlacklist_"$COUNT
 
     $run_VCFTOOLS --gzvcf $vcf_tmp --exclude-positions $vcf --recode --recode-INFO-all --out $OUT 2>>$ERR
     $run_BGZIP -c $OUT.recode.vcf > $OUT.recode.vcf.gz 2>>$ERR
@@ -140,10 +146,31 @@ mv $vcf_tmp.tbi $vcf_no_blacklist.tbi
 
 techo "(2) Removing blacklisted SNPs from SNV file DONE" >> $LOG
 
+#Removing sites with to many alleles and optionally remove indels
+if [ $SNV_only = "YES" ]; then
+    techo "(3) Removing indels and sites with many alleles from file STARTED" >> $LOG
+    OUT=$TMP_DIR/$SUB_NAME"_"$CON_NAME"_Q"$QUAL"_CGQ"$CON_GQ"_SGQ"$SUB_GQ"_"$FILTER"_"$COV"X_"$CHR_NAM"_nonBlacklist"$COUNT"_snv_clear"
+    $run_VCFTOOLS --gzvcf $vcf_no_blacklist --remove-indels --max-alleles $max_alleles --recode --recode-INFO-all --out $OUT 2>>$ERR
+    echo "Only SNVs with no more than $max_alleles alleles" >> $COUNTS
+    $run_GREP -Pvc "^#" $OUT.recode.vcf.gz >> $COUNTS
+else
+    techo "(3) Removing sites with many alleles from file STARTED" >> $LOG
+    OUT=$TMP_DIR/$SUB_NAME"_"$CON_NAME"_Q"$QUAL"_CGQ"$CON_GQ"_SGQ"$SUB_GQ"_"$FILTER"_"$COV"X_"$CHR_NAM"_nonBlacklist"$COUNT"_clear"
+    $run_VCFTOOLS --gzvcf $vcf_no_blacklist --max-alleles $max_alleles --recode --recode-INFO-all --out $OUT 2>>$ERR
+    echo "Only sites with no more than $max_alleles alleles" >> $COUNTS
+    $run_GREP -Pvc "^#" $OUT.recode.vcf >> $COUNTS
+fi
+$run_BGZIP -c $OUT.recode.vcf > $OUT.recode.vcf.gz 2>>$ERR
+$run_TABIX $OUT.recode.vcf.gz 2>>$ERR
+vcf_clear=$OUT".recode.vcf.gz"
+techo "(3) Removing (indels and) sites with many alleles from file DONE" >> $LOG
+
+
+
 #Load appropriate R version
-techo "(3) Filtering SNV file with R STARTED" >> $LOG
-$run_RSCRIPT $RSCRIPT $vcf_no_blacklist $CON $SUB $VAF $vcf_no_evidence_and_called $vcf_final $VAF_plot_file 2>>$ERR
-techo "(3) Filtering SNV file with R DONE" >> $LOG
+techo "(4) Filtering SNV file with R STARTED" >> $LOG
+$run_RSCRIPT $RSCRIPT $vcf_clear $CON $SUB $VAF $vcf_no_evidence_and_called $vcf_final $VAF_plot_file $MQ 2>>$ERR
+techo "(4) Filtering SNV file with R DONE" >> $LOG
 
 
 
@@ -153,7 +180,7 @@ vcf_final_tmp=$vcf_final"_tmp"
 
 TIME=`date +"%Y-%m-%d_%H:%M:%S"`
 #FINAL_HEADER=`grep -P "^#" $vcf_final`
-HEADER_ADD="##SNVFI_filtering=<Version=$VERSION, Date=$TIME, Tools='bio-vcf=$run_BIOVCF tabix=$run_TABIX vcftools=$run_VCFTOOLS rscript=$run_RSCRIPT', SNV=$SNV, SUB=$SUB, CON=$CON, OUT_DIR=$OUT_DIR, QUAL=$QUAL, SUB_GQ=$SUB_GQ, CON_GQ=$CON_GQ,COV=$COV, VAF=$VAF, BLACKLIST=["
+HEADER_ADD="##SNVFI_filtering=<Version=$VERSION, Date=$TIME, Tools='bio-vcf=$run_BIOVCF tabix=$run_TABIX vcftools=$run_VCFTOOLS rscript=$run_RSCRIPT', SNV=$SNV, SUB=$SUB, CON=$CON, OUT_DIR=$OUT_DIR, QUAL=$QUAL, SUB_GQ=$SUB_GQ, CON_GQ=$CON_GQ,COV=$COV, VAF=$VAF, CHR=$CHR_NAM, BLACKLIST=["
 HEADER_ADD+=`join , ${BLACKLIST[@]}`
 HEADER_ADD+="]>"
 
@@ -163,7 +190,7 @@ $run_GREP -P "^#CHROM" $vcf_final >> $vcf_final_tmp
 $run_GREP -Pv "^#" $vcf_final >> $vcf_final_tmp
 mv $vcf_final_tmp $vcf_final
 
-techo "(4) Writing info on mutation numbers to log file STARTED" >> $LOG
+techo "(5) Writing info on mutation numbers to log file STARTED" >> $LOG
 
 # Write info on mutations numbers to log file
 echo "No evidence control and called:" >> $COUNTS
@@ -172,19 +199,19 @@ $run_GREP -Pvc "^#" $vcf_no_evidence_and_called >> $COUNTS
 echo "Called and VAF > $VAF in subject:" >> $COUNTS
 $run_GREP -Pvc "^#" $vcf_final >> $COUNTS
 
-techo "(4) Writing info on mutation numbers to log file DONE" >> $LOG
-techo "(5) Removing files that are not needed STARTED" >> $LOG
+techo "(5) Writing info on mutation numbers to log file DONE" >> $LOG
+techo "(6) Removing files that are not needed STARTED" >> $LOG
 
 # remove files that are not needed
 if [ $CLEANUP == "YES" ]; then
     rm -r $TMP_DIR
-    rm $OUT_DIR/*autosomal.vcf
-    rm $OUT_DIR/*autosomal.vcf.gz
-    rm $OUT_DIR/*autosomal.vcf.gz.tbi
+    rm $OUT_DIR/*$CHR_NAM.vcf
+    rm $OUT_DIR/*$CHR_NAM.vcf.gz
+    rm $OUT_DIR/*$CHR_NAM.vcf.gz.tbi
     rm $OUT_DIR/*nonBlacklist.vcf.gz
     rm $OUT_DIR/*nonBlacklist.vcf.gz.tbi
-    rm $vcf_filtered"tmp1
-    rm $vcf_filtered"tmp2
+    rm $vcf_filtered"tmp1"
+    rm $vcf_filtered"tmp2"
 fi
 
-techo "(5) Removing files that are not needed DONE" >> $LOG
+techo "(6) Removing files that are not needed DONE" >> $LOG

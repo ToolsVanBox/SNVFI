@@ -1,14 +1,21 @@
-## SNVFI 
+## SNVFI
 Single Nucleotide Variant Filtering
+
+##New features present in this fork
+* Filter on MQ
+* Select chromosomes you want to analyze
+* Possibility to remove indels
+* Filter on maximum number of alleles per site
+
 
 ## Download
 Individual releases can be downloaded from:
 ```bash
-    https://github.com/CuppenResearch/SNVFI/releases
+    https://github.com/ToolsVanBox/SNVFI
 ```
 Alternatively use git clone:
 ```bash
-    git@github.com:CuppenResearch/SNVFI.git
+    git@github.com:ToolsVanBox/SNVFI
 ```
 
 ## Usage
@@ -47,7 +54,11 @@ file per filtering run.
     COV=<Minimum coverage threshold>
     FILTER=<Select either ALL variants or only PASS>
     VAF=<Variant Allele Frequency threshold>
-    
+    MQ=<Minimum MQ quality>
+    CHR="1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 X" 		#Specifiy chromosomes with spaces
+    CHR_NAM=<Name for the chosen selection of chromosomes. For example 'autosomal'>
+    SNV_only=<YES | NO>
+    max_alleles=<Maximum number of alleles that can be present at a given site>
 
     MAIL=<Mail address for qsub>
 
@@ -58,23 +69,24 @@ file per filtering run.
 ```bash
     sh SNVFI_run.sh <config> <ini>
 ```
+The full path needs to be given for both the config and ini file.
 
 ## Dependencies
 
 ### OS
-    - GNU/Linux (tested on CentOS Linux release 7.2.1511
+    - GNU/Linux (tested on CentOS Linux release 7.6.1810)
 
 ### Grid Engine
-    - (optional) Sun Grid Engine (tested on SGE 8.1.8)
+    - (optional) Sun Grid Engine (tested on SGE 8.1.9)
 
 ### Standalone tools
-    - R >= 3.2.2 (https://www.r-project.org)
+    - R 3.5.0 (https://www.r-project.org)
     - bio-vcf 0.9.2 (https://rubygems.org/gems/bio-vcf/versions/0.9.2)
-    - tabix 0.2.6 (http://www.htslib.org)
-    - vcftools 0.1.14 (https://vcftools.github.io)
-    - zgrep, grep
+    - htslib 1.8 (http://www.htslib.org)
+    - vcftools 0.1.15 (https://vcftools.github.io)
+    - zgrep, grep 3.1
 
 ### R libraries
-    - VariantAnnotation
-    - ggplot2
-    - reshape2
+    - VariantAnnotation 1.26.1
+    - ggplot2 3.0.0
+    - reshape2 1.4.3
