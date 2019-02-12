@@ -1,7 +1,7 @@
 ## SNVFI
 Single Nucleotide Variant Filtering
 
-##New features present in this fork
+## New features present in this fork
 * Filter on MQ
 * Select chromosomes you want to analyze
 * Possibility to remove indels
